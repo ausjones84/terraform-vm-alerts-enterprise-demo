@@ -1,0 +1,27 @@
+# ---------------------------------------------------------------------------
+# terraform-scripts/dev/action_group/terraform.tfvars.example
+#
+# Copy this file to terraform.tfvars and populate with real values.
+# Do NOT commit terraform.tfvars to source control (see .gitignore).
+# ---------------------------------------------------------------------------
+
+resource_group_name     = "rg-monitoring-dev"
+action_group_name       = "ag-vm-alerts-dev"
+action_group_short_name = "vmAlertsDev"
+
+email_receivers = [
+  {
+      name          = "OpsTeam"
+          email_address = "ops-team@example.com"
+            },
+              {
+                  name          = "InfraLead"
+                      email_address = "infra-lead@example.com"
+                        }
+                        ]
+
+                        tags = {
+                          environment = "dev"
+                            managed_by  = "terraform"
+                              team        = "platform-engineering"
+                              }
