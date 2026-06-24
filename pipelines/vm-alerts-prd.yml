@@ -1,0 +1,164 @@
+# ===========================================================================
+# pipelines/vm-alerts-prd.yml
+#
+# Azure DevOps YAML Pipeline — VM Alerts PRD Environment
+#
+# PRD-SPECIFIC REQUIREMENTS:
+#   - Manual approval gate required before applying to production
+#   - No scheduled/automatic triggers — manual or PR-only
+#   - Separate Variable Group for PRD secrets
+  #   - Pipeline apply only — no local terraform apply in production
+  #
+  # PLACEHOLDERS (replace before running):
+  #   - YOUR_SERVICE_CONNECTION_PRD : Azure DevOps service connection for PRD
+    #   - YOUR_VARIABLE_GROUP_PRD     : Azure DevOps Variable Group for PRD
+      #   - YOUR_STORAGE_ACCOUNT_PRD    : Azure Storage Account for PRD backend state
+        #   - YOUR_RESOURCE_GROUP_PRD     : Resource Group for PRD Terraform state
+          #   - YOUR_APPROVER_EMAIL         : Email/group for approval notifications
+            # ===========================================================================
+
+            trigger: none
+
+            pr: none
+
+            variables:
+              - group: YOUR_VARIABLE_GROUP_PRD
+              - name: TF_VERSION
+                value: "1.5.7"
+              - name: ENV
+                value: "prd"
+
+            pool:
+              vmImage: "ubuntu-latest"
+
+            stages:
+              # ---------------------------------------------------------------------------
+            # Stage 1: Plan Only (no apply) — for PR review visibility
+                # ---------------------------------------------------------------------------
+                - stage: Plan_PRD
+              displayName: "Terraform Plan - PRD (Review Only)"
+                  jobs:
+                    - job: PlanActionGroup
+                      displayName: "Plan - PRD Action Group"
+                      steps:
+                        - task: TerraformInstaller@1
+                          inputs:
+              terraformVersion: $(TF_VERSION)
+
+                        - task: AzureCLI@2
+                          displayName: "Init + Plan PRD Action Group"
+                          inputs:
+                            azureSubscription: "YOUR_SERVICE_CONNECTION_PRD"
+                            scriptType: "bash"
+                            scriptLocation: "inlineScript"
+                            inlineScript: |
+                              terraform -chdir=terraform-scripts/prd/action_group init \
+              -backend-config="storage_account_name=YOUR_STORAGE_ACCOUNT_PRD" \
+                -backend-config="container_name=tfstate-prd" \
+                  -backend-config="key=prd/action_group/terraform.tfstate" \
+                    -backend-config="resource_group_name=YOUR_RESOURCE_GROUP_PRD"
+                                      terraform -chdir=terraform-scripts/prd/action_group validate
+                                      terraform -chdir=terraform-scripts/prd/action_group plan \
+                      -var="resource_group_name=$(PRD_RESOURCE_GROUP)" \
+                                        -out=ag_prd.tfplan
+
+                            - job: PlanVmAlerts
+                              displayName: "Plan - PRD VM Alerts"
+                      dependsOn: PlanActionGroup
+                              steps:
+                                - task: TerraformInstaller@1
+                                              inputs:
+                                  terraformVersion: $(TF_VERSION)
+
+                                            - task: AzureCLI@2
+                                                          displayName: "Init + Plan PRD VM Alerts"
+                                                          inputs:
+                                                            azureSubscription: "YOUR_SERVICE_CONNECTION_PRD"
+                                                            scriptType: "bash"
+                                                            scriptLocation: "inlineScript"
+                                                            inlineScript: |
+                                                              terraform -chdir=terraform-scripts/prd/vm-alerts init \
+                                              -backend-config="storage_account_name=YOUR_STORAGE_ACCOUNT_PRD" \
+                                                -backend-config="container_name=tfstate-prd" \
+                                                  -backend-config="key=prd/vm-alerts/terraform.tfstate" \
+                                                    -backend-config="resource_group_name=YOUR_RESOURCE_GROUP_PRD"
+                                                                      terraform -chdir=terraform-scripts/prd/vm-alerts validate
+                                                                      terraform -chdir=terraform-scripts/prd/vm-alerts plan \
+                                                      -var="resource_group_name=$(PRD_RESOURCE_GROUP)" \
+                                                      -var="action_group_id=$(PRD_ACTION_GROUP_ID_PLACEHOLDER)" \
+                                                                        -out=alerts_prd.tfplan
+
+                                                        # ---------------------------------------------------------------------------
+                                                        # Stage 2: APPROVAL GATE — Manual approval required before PRD apply
+                                                        # Configure this in Azure DevOps Environments → prd-approval
+                                                        # ---------------------------------------------------------------------------
+                                                        - stage: Approval_PRD
+                                                          displayName: "Approval Gate - PRD Deploy"
+                                                      dependsOn: Plan_PRD
+                                                          jobs:
+                                                            - deployment: WaitForApproval
+                                                              displayName: "Waiting for PRD Approval"
+                                                              environment: "prd-approval"
+                                                              strategy:
+                                                                runOnce:
+                                                                  deploy:
+                                                                    steps:
+                                                                      - script: echo "PRD approval received. Proceeding with deployment."
+
+                                                        # ---------------------------------------------------------------------------
+                                                      # Stage 3: Apply to PRD (post-approval)
+                                                        # ---------------------------------------------------------------------------
+                                                        - stage: Apply_PRD
+                                                          displayName: "Apply to PRD"
+                                                      dependsOn: Approval_PRD
+                                                          jobs:
+                                                            - job: ApplyActionGroup
+                                                              displayName: "Apply - PRD Action Group"
+                                                              steps:
+                                                                - task: TerraformInstaller@1
+                                                                              inputs:
+                                                                  terraformVersion: $(TF_VERSION)
+
+                                                                            - task: AzureCLI@2
+                                                                                          displayName: "Terraform Apply - PRD Action Group"
+                                                                                          inputs:
+                                                                                            azureSubscription: "YOUR_SERVICE_CONNECTION_PRD"
+                                                                                            scriptType: "bash"
+                                                                                            scriptLocation: "inlineScript"
+                                                                                            inlineScript: |
+                                                                                              terraform -chdir=terraform-scripts/prd/action_group init \
+                                                                              -backend-config="storage_account_name=YOUR_STORAGE_ACCOUNT_PRD" \
+                                                                                -backend-config="container_name=tfstate-prd" \
+                                                                                  -backend-config="key=prd/action_group/terraform.tfstate" \
+                                                                                    -backend-config="resource_group_name=YOUR_RESOURCE_GROUP_PRD"
+                                                                                                      terraform -chdir=terraform-scripts/prd/action_group apply -auto-approve \
+                                                                                      -var="resource_group_name=$(PRD_RESOURCE_GROUP)"
+                                                                                      AG_ID=$(terraform -chdir=terraform-scripts/prd/action_group output -raw action_group_id)
+                                                                                      echo "##vso[task.setvariable variable=ACTION_GROUP_ID;isOutput=true]$AG_ID"
+                                                                                                  name: ApplyAG
+
+                                                                                            - job: ApplyVmAlerts
+                                                                                              displayName: "Apply - PRD VM Alerts"
+                                                                                      dependsOn: ApplyActionGroup
+                                                                                              variables:
+                                                                                      ACTION_GROUP_ID: $[dependencies.ApplyActionGroup.outputs['ApplyAG.ACTION_GROUP_ID']]
+                                                                                              steps:
+                                                                                                - task: TerraformInstaller@1
+                                                                                                              inputs:
+                                                                                                  terraformVersion: $(TF_VERSION)
+
+                                                                                                            - task: AzureCLI@2
+                                                                                                                          displayName: "Terraform Apply - PRD VM Alerts"
+                                                                                                                          inputs:
+                                                                                                                            azureSubscription: "YOUR_SERVICE_CONNECTION_PRD"
+                                                                                                                            scriptType: "bash"
+                                                                                                                            scriptLocation: "inlineScript"
+                                                                                                                            inlineScript: |
+                                                                                                                              terraform -chdir=terraform-scripts/prd/vm-alerts init \
+                                                                                                              -backend-config="storage_account_name=YOUR_STORAGE_ACCOUNT_PRD" \
+                                                                                                                -backend-config="container_name=tfstate-prd" \
+                                                                                                                  -backend-config="key=prd/vm-alerts/terraform.tfstate" \
+                                                                                                                    -backend-config="resource_group_name=YOUR_RESOURCE_GROUP_PRD"
+                                                                                                                                      terraform -chdir=terraform-scripts/prd/vm-alerts apply -auto-approve \
+                                                                                                                      -var="resource_group_name=$(PRD_RESOURCE_GROUP)" \
+                                                                                                                      -var="action_group_id=$(ACTION_GROUP_ID)"
