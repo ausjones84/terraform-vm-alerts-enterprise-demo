@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+# terraform-scripts/dmz/action_group/terraform.tfvars.example
+# ---------------------------------------------------------------------------
+
+resource_group_name = "rg-monitoring-dmz"
+action_group_name   = "ag-vm-alerts-dmz"
+short_name          = "vmalertdmz"
+
+email_receivers = [
+  {
+      name          = "DmzSecurityTeam"
+          email_address = "security-dmz@yourcompany.com"
+            },
+              {
+                  name          = "DmzOpsTeam"
+                      email_address = "ops-dmz@yourcompany.com"
+                        }
+                        ]
+
+                        tags = {
+                          environment = "dmz"
+                            managed_by  = "terraform"
+                              project     = "vm-alerts"
+                                team        = "platform-engineering"
+                                }
