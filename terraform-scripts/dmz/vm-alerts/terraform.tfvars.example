@@ -8,24 +8,28 @@ resource_group_name = "rg-monitoring-dmz"
 action_group_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/rg-monitoring-dmz/providers/microsoft.insights/actionGroups/ag-vm-alerts-dmz"
 
 cpu_threshold = 70
-severity      = 1
-frequency     = "PT1M"
-window_size   = "PT5M"
+memory_threshold_bytes = 524288000
+disk_read_threshold_bytes_per_sec = 52428800
+network_in_threshold_bytes = 524288000
+severity = 1
+disk_network_severity = 2
+frequency = "PT1M"
+window_size = "PT5M"
 
 vms = [
-  {
-      name        = "vm-dmz-web-01"
-          resource_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/rg-dmz/providers/Microsoft.Compute/virtualMachines/vm-dmz-web-01"
-            },
-              {
-                  name        = "vm-dmz-proxy-01"
-                      resource_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/rg-dmz/providers/Microsoft.Compute/virtualMachines/vm-dmz-proxy-01"
-                        }
-                        ]
+{
+name = "vm-dmz-web-01"
+resource_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/rg-dmz/providers/Microsoft.Compute/virtualMachines/vm-dmz-web-01"
+},
+{
+name = "vm-dmz-proxy-01"
+resource_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/rg-dmz/providers/Microsoft.Compute/virtualMachines/vm-dmz-proxy-01"
+}
+]
 
-                        tags = {
-                          environment = "dmz"
-                            managed_by  = "terraform"
-                              project     = "vm-alerts"
-                                team        = "platform-engineering"
-                                }
+tags = {
+environment = "dmz"
+managed_by = "terraform"
+project = "vm-alerts"
+team = "platform-engineering"
+}
