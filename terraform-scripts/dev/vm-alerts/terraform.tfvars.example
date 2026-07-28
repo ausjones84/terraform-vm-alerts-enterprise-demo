@@ -3,9 +3,9 @@
 #
 # Copy this file to terraform.tfvars and populate with real values.
 # In enterprise pipelines, these values are injected via:
-#   - Azure DevOps Variable Groups
-#   - Pipeline secure files
-#   - Output variables from the action_group pipeline stage
+# - Azure DevOps Variable Groups
+# - Pipeline secure files
+# - Output variables from the action_group pipeline stage
 #
 # Do NOT commit terraform.tfvars to source control.
 # ---------------------------------------------------------------------------
@@ -17,30 +17,37 @@ resource_group_name = "rg-monitoring-dev"
 # In local run: paste the Action Group resource ID from the Azure portal.
 action_group_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-monitoring-dev/providers/microsoft.insights/actionGroups/ag-vm-alerts-dev"
 
-# VM inventory — one object per VM to be monitored
+# VM inventory one object per VM to be monitored
 # Replace resource_id values with real Azure VM resource IDs
+# Note: vm-db-dev-01 below represents a self-managed PostgreSQL server running
+# on a VM. It gets the same CPU/Memory/Disk/Network alert set as any other VM
+# Azure Monitor alerts on the host, not inside the Postgres engine.
 vms = [
-  {
-      name        = "vm-app-dev-01"
-          resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-app-dev/providers/Microsoft.Compute/virtualMachines/vm-app-dev-01"
-            },
-              {
-                  name        = "vm-app-dev-02"
-                      resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-app-dev/providers/Microsoft.Compute/virtualMachines/vm-app-dev-02"
-                        },
-                          {
-                              name        = "vm-db-dev-01"
-                                  resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-db-dev/providers/Microsoft.Compute/virtualMachines/vm-db-dev-01"
-                                    }
-                                    ]
+{
+name = "vm-app-dev-01"
+resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-app-dev/providers/Microsoft.Compute/virtualMachines/vm-app-dev-01"
+},
+{
+name = "vm-app-dev-02"
+resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-app-dev/providers/Microsoft.Compute/virtualMachines/vm-app-dev-02"
+},
+{
+name = "vm-db-dev-01"
+resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-db-dev/providers/Microsoft.Compute/virtualMachines/vm-db-dev-01"
+}
+]
 
-                                    cpu_threshold = 80
-                                    severity      = 2
-                                    frequency     = "PT5M"
-                                    window_size   = "PT15M"
+cpu_threshold = 80
+memory_threshold_bytes = 524288000
+disk_read_threshold_bytes_per_sec = 52428800
+network_in_threshold_bytes = 524288000
+severity = 2
+disk_network_severity = 3
+frequency = "PT5M"
+window_size = "PT15M"
 
-                                    tags = {
-                                      environment = "dev"
-                                        managed_by  = "terraform"
-                                          team        = "platform-engineering"
-                                          }
+tags = {
+environment = "dev"
+managed_by = "terraform"
+team = "platform-engineering"
+}
